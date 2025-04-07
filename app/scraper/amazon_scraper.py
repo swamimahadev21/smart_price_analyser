@@ -7,9 +7,10 @@ import time
 
 def get_amazon_price(product_name):
     options = Options()
-    options.add_argument("--headless")  # Run in background
+    options.add_argument("--headless")  # Run without GUI
     options.add_argument("--disable-gpu")
     options.add_argument("--no-sandbox")
+    options.add_argument('--disable-blink-features=AutomationControlled')
 
     service = Service(ChromeDriverManager().install())
     driver = webdriver.Chrome(service=service, options=options)
@@ -17,22 +18,27 @@ def get_amazon_price(product_name):
     query = product_name.replace(" ", "+")
     url = f"https://www.amazon.in/s?k={query}"
     driver.get(url)
-
-    time.sleep(3)  # Wait for JS to load content
+    time.sleep(3)
 
     soup = BeautifulSoup(driver.page_source, "lxml")
     driver.quit()
 
     try:
-        result = soup.select_one("div.s-main-slot div.s-result-item")
-        title = result.select_one("h2 span")
-        price = result.select_one(".a-price-whole")
+        results = soup.select("div.s-main-slot div[data-component-type='s-search-result']")
+        for item in results:
+            title_tag = item.select_one("h2 span")
+            price_whole = item.select_one("span.a-price-whole")
+            price_fraction = item.select_one("span.a-price-fraction")
+            if title_tag and price_whole:
+                title = title_tag.get_text(strip=True)
+                price = f"₹{price_whole.get_text(strip=True)}.{price_fraction.get_text(strip=True) if price_fraction else '00'}"
+                return {
+                    "site": "Amazon",
+                    "title": title,
+                    "price": price
+                }
 
-        return {
-            "site": "Amazon",
-            "title": title.get_text(strip=True) if title else "Title not found",
-            "price": "₹" + price.get_text(strip=True) if price else "Price not found"
-        }
+        return {"site": "Amazon", "title": "Not found", "price": "N/A"}
     except Exception as e:
         print("Error during scraping:", e)
         return {"site": "Amazon", "title": "Not found", "price": "N/A"}

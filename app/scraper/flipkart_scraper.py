@@ -1,31 +1,38 @@
-import requests
+from selenium import webdriver
+from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.chrome.service import Service
+from webdriver_manager.chrome import ChromeDriverManager
 from bs4 import BeautifulSoup
+import time
 
 def get_flipkart_price(product_name):
-    headers = {
-        "User-Agent": "Mozilla/5.0"
-    }
+    options = Options()
+    options.add_argument("--headless")
+    options.add_argument("--disable-gpu")
+    options.add_argument("--no-sandbox")
+
+    driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
+
     query = product_name.replace(" ", "+")
     url = f"https://www.flipkart.com/search?q={query}"
-    response = requests.get(url, headers=headers)
-    soup = BeautifulSoup(response.text, "lxml")
+    driver.get(url)
     
+    time.sleep(5)
+
+    # Save the full page to inspect it
+    with open("flipkart_output.html", "w", encoding="utf-8") as f:
+        f.write(driver.page_source)
+
+    soup = BeautifulSoup(driver.page_source, "lxml")
+    driver.quit()
+
     try:
-        title = soup.select_one("div._4rR01T")
-        price = soup.select_one("div._30jeq3")
-        
-        return {
-            "site": "Flipkart",
-            "title": title.get_text(strip=True) if title else "Title not found",
-            "price": price.get_text(strip=True) if price else "Price not found"
-        }
-    except Exception as e:
-        print("Error during Flipkart scraping:", e)
+        title = soup.select_one("div._4rR01T").get_text(strip=True)
+        price = soup.select_one("div._30jeq3").get_text(strip=True)
+        return {"site": "Flipkart", "title": title, "price": price}
+    except:
         return {"site": "Flipkart", "title": "Not found", "price": "N/A"}
 
-# ✅ CLI test support
 if __name__ == "__main__":
-    import sys
-    query = sys.argv[1] if len(sys.argv) > 1 else "iPhone 13"
-    result = get_flipkart_price(query)
-    print("Flipkart Result:", result["title"], "-", result["price"])
+    result = get_flipkart_price("iPhone 13")
+    print(f"Flipkart Result: {result['title']} - {result['price']}")
